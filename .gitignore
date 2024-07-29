@@ -1,2 +1,18 @@
-/vendor
+# Ignore vendor directory
+/vendor/
 
+
+# Ignore uploads directory
+/uploads/
+
+
+# Ignore IDE or editor specific files
+*.idea/
+*.vscode/
+
+# Ignore system files
+.DS_Store
+Thumbs.db
+
+# Ignore any log files
+*.log
