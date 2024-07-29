@@ -25,8 +25,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["exceldata"]) && $_FIL
     // CHECKING IF THE FILE UPLOADED IS IN THE FORMAT ALLOWED
     if (!in_array($file_extension, $extension_allowed)) {
         $errorMsg = "File type not supported. Please upload an .xls or .xlsx file.";
+        // CHECKING IF THE FILE UPLOADED IS WRITTABLE -> MY OWN PURPOSE
     } elseif (!is_writable($uploaded_dir)) {
         echo "Upload directory is not writable";
+        // CHECKING IF THE FILE UPLOADED NAME ALREADY EXITS 
     } elseif (file_exists($uploaded_file)) {
         $errorMsg = "A file with the same name already exists";
     } elseif (!move_uploaded_file($tempname, $uploaded_file)) {
@@ -34,7 +36,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["exceldata"]) && $_FIL
     } else {
         $uploadSuccessfull = "File uploaded successfully.";
 
-        // Store the original file name in the session
+        // STORING THE EXCEL FILE NAME BEACUSE STATE GETS LOST BETWEEN REQUESTS
         $_SESSION['uploaded_file_name'] = $filename;
 
         try {
@@ -60,17 +62,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["exceldata"]) && $_FIL
 $query = "SELECT * FROM demo_data";
 $result = mysqli_query($conn, $query);
 
-// Handle PDF download request
+// HANDLING PDF DOWNLOAD REQUEST
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["download_pdf"])) {
-    $original_filename = $_SESSION['uploaded_file_name'] ?? 'default';
+    $original_filename = $_SESSION['uploaded_file_name'] ?? 'geekworkz';
     $timestamp = date('Y-m-d_H-i-s');
     $pdf_filename = pathinfo($original_filename, PATHINFO_FILENAME) . "_$timestamp.pdf";
 
-    // GENERATE PDF with filename based on uploaded file name and timestamp
+    // GENERATING PDF with filename based on uploaded file name and timestamp
     generatePDF($result, $pdf_filename);
+
+    header("Location: pdf_result.php");
+    exit();
 }
 
-function generatePDF($result, $filename)
+function generatePDF($result, $pdf_filename)
 {
     // Configure mPDF to use a writable directory for PDF files
     $config = [
@@ -124,7 +129,11 @@ function generatePDF($result, $filename)
     $html .= '</tbody></table>';
 
     $mpdf->WriteHTML($html);
-    $mpdf->Output("uploads/{$filename}", \Mpdf\Output\Destination::FILE);
+    $mpdf->Output("uploads/{$pdf_filename}", \Mpdf\Output\Destination::FILE);
+
+    // SET SESION VALUES TO INDICATE THE PDF GENARATION COMPLETE 
+    $_SESSION['pdf_generated'] = true;
+    $_SESSION['pdf_filename'] = $pdf_filename;
 }
 ?>
 
@@ -182,7 +191,7 @@ function generatePDF($result, $filename)
                     </div>
                     <form method="post" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>">
                         <button type="submit" name="download_pdf" value="download_pdf" class="btn btn-secondary">
-                            Download PDF
+                            Generate PDF
                         </button>
                     </form>
                 </div>
