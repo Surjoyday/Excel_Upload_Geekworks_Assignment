@@ -92,6 +92,10 @@ function generatePDF($result, $pdf_filename)
         table, th, td {
             border: 1px solid black;
         }
+            thead tr{
+            border: 2px solid blue;
+}
+
         th, td {
             padding: 10px;
             text-align: left;

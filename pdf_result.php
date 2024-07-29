@@ -38,7 +38,7 @@ unset($_SESSION['pdf_filename']);
 <body>
     <div class="container">
         <div class="card mt-2 mb-2">
-            <h2 class="text text-center p-3">Click on the Button below to get the PDF</h2>
+            <h2 class="text text-center p-3">Download as PDF</h2>
             <div class="card-body">
                 <p class="alert alert-success">PDF generated successfully.</p>
                 <a href="uploads/<?= htmlspecialchars($pdf_filename); ?>" class="btn btn-primary" target="_blank">Download PDF</a>
