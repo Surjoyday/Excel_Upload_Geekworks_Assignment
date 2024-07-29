@@ -1,7 +1,7 @@
 <?php
+session_start();
 include("connection.php");
 
-// use PhpOffice\PhpSpreadsheet\Reader\Xlsx;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 require_once('vendor/autoload.php');
@@ -12,6 +12,7 @@ $uploadSuccessfull = null;
 // VARIABLE TO HOLD ERROR MESSAGE 
 $errorMsg = null;
 
+// Store the filename in a session variable
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["exceldata"]) && $_FILES["exceldata"]["error"] == UPLOAD_ERR_OK) {
     $filename = $_FILES["exceldata"]["name"];
     $tempname = $_FILES["exceldata"]["tmp_name"];
@@ -33,6 +34,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["exceldata"]) && $_FIL
     } else {
         $uploadSuccessfull = "File uploaded successfully.";
 
+        // Store the original file name in the session
+        $_SESSION['uploaded_file_name'] = $filename;
+
         try {
             $spreadsheet = IOFactory::load($uploaded_file);
             $excelSheet = $spreadsheet->getActiveSheet();
@@ -48,12 +52,80 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["exceldata"]) && $_FIL
             $errorMsg = "Error loading file: " . $e->getMessage();
         }
     }
+} else {
+    $errorMsg = "You first need to select a file to upload";
 }
 
 // FETCHING THE DATA FROM THE DATABASE 
 $query = "SELECT * FROM demo_data";
 $result = mysqli_query($conn, $query);
 
+// Handle PDF download request
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["download_pdf"])) {
+    $original_filename = $_SESSION['uploaded_file_name'] ?? 'default';
+    $timestamp = date('Y-m-d_H-i-s');
+    $pdf_filename = pathinfo($original_filename, PATHINFO_FILENAME) . "_$timestamp.pdf";
+
+    // GENERATE PDF with filename based on uploaded file name and timestamp
+    generatePDF($result, $pdf_filename);
+}
+
+function generatePDF($result, $filename)
+{
+    // Configure mPDF to use a writable directory for PDF files
+    $config = [
+        'tempDir' => __DIR__ . '/uploads'
+    ];
+    $mpdf = new \Mpdf\Mpdf($config);
+
+    $html = '
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+    </style>
+    <h2>Uploaded Data</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Index</th>
+                <th>First Name</th>
+                <th>Last Name</th>
+                <th>Gender</th>
+                <th>Country</th>
+                <th>Age</th>
+                <th>Date</th>
+                <th>ID</th>
+            </tr>
+        </thead>
+        <tbody>';
+
+    while ($row = mysqli_fetch_assoc($result)) {
+        $html .= '<tr>
+            <td>' . htmlspecialchars($row['index']) . '</td>
+            <td>' . htmlspecialchars($row['first_name']) . '</td>
+            <td>' . htmlspecialchars($row['last_name']) . '</td>
+            <td>' . htmlspecialchars($row['gender']) . '</td>
+            <td>' . htmlspecialchars($row['country']) . '</td>
+            <td>' . htmlspecialchars($row['age']) . '</td>
+            <td>' . htmlspecialchars($row['entry_date']) . '</td>
+            <td>' . htmlspecialchars($row['id']) . '</td>
+        </tr>';
+    }
+
+    $html .= '</tbody></table>';
+
+    $mpdf->WriteHTML($html);
+    $mpdf->Output("uploads/{$filename}", \Mpdf\Output\Destination::FILE);
+}
 ?>
 
 <!DOCTYPE html>
@@ -67,7 +139,6 @@ $result = mysqli_query($conn, $query);
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
-
     <style>
         body {
             font-family: "Montserrat", sans-serif;
@@ -88,22 +159,17 @@ $result = mysqli_query($conn, $query);
 </head>
 
 <body>
-
     <div class="container">
-
         <div class="card mt-2 mb-2 no-print">
             <h2 class="text text-center p-3">Upload Excel Data</h2>
-
-
             <div class="card-header">
                 <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="post" enctype="multipart/form-data">
                     <div class="mb-3 mt-3">
                         <label for="file_upload" class="form-label">Upload Excel</label>
                         <input type="file" class="form-control" name="exceldata">
                     </div>
-                    <button type="submit" name="file_upload_btn" class="btn btn-primary">Upload</button>
+                    <button type="submit" name="upload_btn" value="upload_btn" class="btn btn-primary">Upload</button>
                 </form>
-
             </div>
         </div>
 
@@ -114,19 +180,19 @@ $result = mysqli_query($conn, $query);
                     <div>
                         <?= $uploadSuccessfull ?>
                     </div>
-                    <button onclick="window.print()" class="btn btn-secondary">
-                        Print
-                    </button>
+                    <form method="post" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>">
+                        <button type="submit" name="download_pdf" value="download_pdf" class="btn btn-secondary">
+                            Download PDF
+                        </button>
+                    </form>
                 </div>
             </div>
-
 
             <div class="card mt-2 mb-2 print-only">
                 <div class="card-header">
                     <h2 class="text-center p-3">Uploaded Data</h2>
                 </div>
-                <div class="no-print">
-                </div>
+                <div class="no-print"></div>
                 <div class="card-body">
                     <table class="table">
                         <thead>
@@ -158,13 +224,11 @@ $result = mysqli_query($conn, $query);
                     </table>
                 </div>
             </div>
-        <?php } elseif ($errorMsg) { ?>
+        <?php } elseif ($errorMsg && isset($_POST["upload_btn"])) { ?>
             <div class="alert alert-danger"><?= htmlspecialchars($errorMsg) ?></div>
         <?php } ?>
-
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-
 </body>
 
 </html>
