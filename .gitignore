@@ -1,18 +1,11 @@
-# Ignore vendor directory
+# Composer
 /vendor/
-
-
-# Ignore uploads directory
-/uploads/
-
-
-# Ignore IDE or editor specific files
-*.idea/
-*.vscode/
-
-# Ignore system files
-.DS_Store
-Thumbs.db
-
-# Ignore any log files
+# IDE files
+.idea/
+.vscode/
+# Temporary files
 *.log
+*.tmp
+*.cache
+# Test files
+/tests/
